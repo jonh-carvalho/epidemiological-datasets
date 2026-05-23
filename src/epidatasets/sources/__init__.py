@@ -28,6 +28,7 @@ if TYPE_CHECKING:
     from epidatasets.sources.malaria_atlas import MalariaAtlasAccessor
     from epidatasets.sources.owid import OWIDAccessor
     from epidatasets.sources.paho import PAHOAccessor
+    from epidatasets.sources.pakistan_nih import PakistanNIHAccessor
     from epidatasets.sources.pathoplexus import PathoplexusAccessor
     from epidatasets.sources.respicast import RespiCastAccessor
     from epidatasets.sources.rki_germany import RKIGermanyAccessor
@@ -53,6 +54,7 @@ __all__ = [
     "MalariaAtlasAccessor",
     "OWIDAccessor",
     "PAHOAccessor",
+    "PakistanNIHAccessor",
     "PathoplexusAccessor",
     "RespiCastAccessor",
     "RKIGermanyAccessor",

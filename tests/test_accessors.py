@@ -379,6 +379,42 @@ class TestWHO:
         assert accessor.source_name == "who"
 
 
+class TestPakistanNIH:
+    def test_initialization(self):
+        from epidatasets.sources.pakistan_nih import PakistanNIHAccessor
+        accessor = PakistanNIHAccessor()
+        assert accessor is not None
+        assert accessor.source_name == "pakistan_nih"
+
+    def test_list_countries(self):
+        from epidatasets.sources.pakistan_nih import PakistanNIHAccessor
+        accessor = PakistanNIHAccessor()
+        countries = accessor.list_countries()
+        assert isinstance(countries, pd.DataFrame)
+        assert len(countries) == 1
+        assert countries.iloc[0]["country_code"] == "PK"
+
+    def test_build_weekly_url(self):
+        from epidatasets.sources.pakistan_nih import PakistanNIHAccessor
+        accessor = PakistanNIHAccessor()
+        url = accessor._build_weekly_url(2025, 10)
+        assert "phb.nih.org.pk" in url
+        assert "2025" in url
+        assert "10" in url
+
+    def test_priority_diseases(self):
+        from epidatasets.sources.pakistan_nih import PakistanNIHAccessor
+        accessor = PakistanNIHAccessor()
+        assert len(accessor.PRIORITY_DISEASES) > 0
+        assert "Dengue Fever" in accessor.PRIORITY_DISEASES
+
+    def test_provinces(self):
+        from epidatasets.sources.pakistan_nih import PakistanNIHAccessor
+        accessor = PakistanNIHAccessor()
+        assert len(accessor.PROVINCES) > 0
+        assert "Punjab" in accessor.PROVINCES
+
+
 class TestSmoke:
     def test_package_import(self):
         import epidatasets

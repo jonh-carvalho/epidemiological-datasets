@@ -232,11 +232,9 @@ class PakistanNIHAccessor(BaseAccessor):
         """Build the URL for an IDSR weekly bulletin."""
         estimated_month = min((week // 4) + 1, 12)
         month_str = f"{estimated_month:02d}"
-        week_str = f"{week:02d}"
-        filename = f"IDSRS%20Weekly%20Report-{week_str}-{year}.pdf"
         return (
-            f"https://phb.nih.org.pk/wp-content/uploads/"
-            f"{year}/{month_str}/{filename}"
+            f"https://www.nih.org.pk/wp-content/uploads/"
+            f"{year}/{month_str}/Weekly_Report-{week}-{year}.pdf"
         )
 
     def list_available_bulletins(

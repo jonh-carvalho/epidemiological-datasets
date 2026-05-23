@@ -6,6 +6,7 @@ valid data structures. Tests are designed to be fast and non-breaking.
 
 import os
 from datetime import datetime, timedelta
+from pathlib import Path
 
 import pandas as pd
 import pytest
@@ -380,78 +381,116 @@ class TestWHO:
 
 
 class TestPakistanNIH:
-    def test_initialization(self):
+    @pytest.fixture
+    def accessor(self):
         from epidatasets.sources.pakistan_nih import PakistanNIHAccessor
-        accessor = PakistanNIHAccessor()
+        return PakistanNIHAccessor()
+
+    @pytest.fixture
+    def sample_pdf_path(self):
+        return Path(__file__).parent / "fixtures" / "pakistan_nih" / "Weekly_Report-51-2024.pdf"
+
+    def test_initialization(self, accessor):
         assert accessor is not None
         assert accessor.source_name == "pakistan_nih"
 
-    def test_list_countries(self):
-        from epidatasets.sources.pakistan_nih import PakistanNIHAccessor
-        accessor = PakistanNIHAccessor()
+    def test_list_countries(self, accessor):
         countries = accessor.list_countries()
         assert isinstance(countries, pd.DataFrame)
         assert len(countries) == 1
         assert countries.iloc[0]["country_code"] == "PK"
 
-    def test_build_weekly_url(self):
-        from epidatasets.sources.pakistan_nih import PakistanNIHAccessor
-        accessor = PakistanNIHAccessor()
+    def test_build_weekly_url(self, accessor):
         url = accessor._build_weekly_url(2025, 10)
-        assert "phb.nih.org.pk" in url
+        assert "nih.org.pk" in url
         assert "2025" in url
         assert "10" in url
+        assert "Weekly_Report" in url
 
-    def test_priority_diseases(self):
-        from epidatasets.sources.pakistan_nih import PakistanNIHAccessor
-        accessor = PakistanNIHAccessor()
+    def test_priority_diseases(self, accessor):
         assert len(accessor.PRIORITY_DISEASES) > 0
         assert "Dengue Fever" in accessor.PRIORITY_DISEASES
 
-    def test_provinces(self):
-        from epidatasets.sources.pakistan_nih import PakistanNIHAccessor
-        accessor = PakistanNIHAccessor()
+    def test_provinces(self, accessor):
         assert len(accessor.PROVINCES) > 0
         assert "Punjab" in accessor.PROVINCES
 
+    def test_extract_pdf_text(self, accessor, sample_pdf_path):
+        text = accessor._extract_pdf_text(sample_pdf_path)
+        assert isinstance(text, str)
+        assert len(text) > 0
+
+    def test_extract_pdf_tables(self, accessor, sample_pdf_path):
+        tables = accessor._extract_pdf_tables(sample_pdf_path)
+        assert isinstance(tables, list)
+        # Real PDF may or may not have extractable tables
+
 
 class TestOmanMOH:
-    def test_initialization(self):
+    @pytest.fixture
+    def accessor(self):
         from epidatasets.sources.oman_moh import OmanMOHAccessor
-        accessor = OmanMOHAccessor()
+        return OmanMOHAccessor()
+
+    @pytest.fixture
+    def sample_pdf_path(self):
+        return Path(__file__).parent / "fixtures" / "oman_moh" / "annual_health_report_2023.pdf"
+
+    def test_initialization(self, accessor):
         assert accessor is not None
         assert accessor.source_name == "oman_moh"
 
-    def test_list_countries(self):
-        from epidatasets.sources.oman_moh import OmanMOHAccessor
-        accessor = OmanMOHAccessor()
+    def test_list_countries(self, accessor):
         countries = accessor.list_countries()
         assert isinstance(countries, pd.DataFrame)
         assert len(countries) == 1
         assert countries.iloc[0]["country_code"] == "OM"
 
-    def test_build_annual_report_url(self):
-        from epidatasets.sources.oman_moh import OmanMOHAccessor
-        accessor = OmanMOHAccessor()
+    def test_build_annual_report_url(self, accessor):
         url = accessor._build_annual_report_url(2023)
         assert "moh.gov.om" in url
         assert "2023" in url
 
-    def test_governorates(self):
-        from epidatasets.sources.oman_moh import OmanMOHAccessor
-        accessor = OmanMOHAccessor()
+    def test_governorates(self, accessor):
         assert len(accessor.GOVERNORATES) > 0
         assert "Masqat" in accessor.GOVERNORATES
 
-    def test_list_available_reports(self):
-        from epidatasets.sources.oman_moh import OmanMOHAccessor
-        accessor = OmanMOHAccessor()
+    def test_list_available_reports(self, accessor):
         reports = accessor.list_available_reports()
         assert isinstance(reports, pd.DataFrame)
         assert not reports.empty
         assert "year" in reports.columns
         assert reports["year"].min() <= 1984
         assert reports["year"].max() >= 2024
+
+    def test_extract_pdf_text(self, accessor, sample_pdf_path):
+        text = accessor._extract_pdf_text(sample_pdf_path)
+        assert isinstance(text, str)
+        assert "Oman Ministry of Health" in text
+
+    def test_extract_morbidity_mortality(self, accessor, sample_pdf_path):
+        df = accessor.extract_morbidity_mortality(sample_pdf_path)
+        assert isinstance(df, pd.DataFrame)
+        assert "disease" in df.columns
+        assert "Malaria" in df["disease"].values
+
+    def test_extract_health_indicators(self, accessor, sample_pdf_path):
+        df = accessor.extract_health_indicators(sample_pdf_path)
+        assert isinstance(df, pd.DataFrame)
+        assert "indicator" in df.columns
+        assert "life_expectancy" in df["indicator"].values
+
+    def test_extract_health_utilization(self, accessor, sample_pdf_path):
+        df = accessor.extract_health_utilization(sample_pdf_path)
+        assert isinstance(df, pd.DataFrame)
+        assert "metric" in df.columns
+        assert "outpatient_visits" in df["metric"].values
+
+    def test_get_governorate_data(self, accessor, sample_pdf_path):
+        df = accessor.get_governorate_data(sample_pdf_path)
+        assert isinstance(df, pd.DataFrame)
+        assert "governorate" in df.columns
+        assert "Masqat" in df["governorate"].values
 
 
 class TestSmoke:

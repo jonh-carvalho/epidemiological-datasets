@@ -163,6 +163,9 @@ Changelog = "https://github.com/fccoelho/epidemiological-datasets/blob/main/CHAN
 compile-bytecode = true
 reinstall = false
 resolution = "highest"
+dev-dependencies = [
+    "fpdf2>=2.8.7",
+]
 
 [tool.uv.pip]
 generate-hashes = false

@@ -415,6 +415,45 @@ class TestPakistanNIH:
         assert "Punjab" in accessor.PROVINCES
 
 
+class TestOmanMOH:
+    def test_initialization(self):
+        from epidatasets.sources.oman_moh import OmanMOHAccessor
+        accessor = OmanMOHAccessor()
+        assert accessor is not None
+        assert accessor.source_name == "oman_moh"
+
+    def test_list_countries(self):
+        from epidatasets.sources.oman_moh import OmanMOHAccessor
+        accessor = OmanMOHAccessor()
+        countries = accessor.list_countries()
+        assert isinstance(countries, pd.DataFrame)
+        assert len(countries) == 1
+        assert countries.iloc[0]["country_code"] == "OM"
+
+    def test_build_annual_report_url(self):
+        from epidatasets.sources.oman_moh import OmanMOHAccessor
+        accessor = OmanMOHAccessor()
+        url = accessor._build_annual_report_url(2023)
+        assert "moh.gov.om" in url
+        assert "2023" in url
+
+    def test_governorates(self):
+        from epidatasets.sources.oman_moh import OmanMOHAccessor
+        accessor = OmanMOHAccessor()
+        assert len(accessor.GOVERNORATES) > 0
+        assert "Masqat" in accessor.GOVERNORATES
+
+    def test_list_available_reports(self):
+        from epidatasets.sources.oman_moh import OmanMOHAccessor
+        accessor = OmanMOHAccessor()
+        reports = accessor.list_available_reports()
+        assert isinstance(reports, pd.DataFrame)
+        assert not reports.empty
+        assert "year" in reports.columns
+        assert reports["year"].min() <= 1984
+        assert reports["year"].max() >= 2024
+
+
 class TestSmoke:
     def test_package_import(self):
         import epidatasets

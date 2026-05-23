@@ -50,7 +50,7 @@
 
 ---
 
-> A Python library providing unified access to **21 epidemiological data sources** from around the world, with a plugin registry, CLI, and optional extras for specialized data.
+> A Python library providing unified access to **23 epidemiological data sources** from around the world, with a plugin registry, CLI, and optional extras for specialized data.
 
 ## 📋 Table of Contents
 
@@ -79,7 +79,7 @@
 
 **epidatasets** provides:
 
-- **Unified interface** — A single `get_source()` API to access 21 data sources worldwide
+- **Unified interface** — A single `get_source()` API to access 23 data sources worldwide
 - **Plugin registry** — Sources are discovered at runtime via `entry_points`, making it easy to extend
 - **Optional extras** — Install only the dependencies you need (`pip install epidatasets[who,brazil]`)
 - **CLI** — Command-line tool for listing sources, inspecting metadata, and querying countries
@@ -176,7 +176,7 @@ epidemiological-datasets/
 │   ├── _base.py               # BaseAccessor ABC
 │   ├── _registry.py           # Plugin registry (entry_points)
 │   ├── cli.py                 # CLI (typer)
-│   ├── sources/               # 21 data source accessors
+│   ├── sources/               # 23 data source accessors
 │   │   ├── __init__.py
 │   │   ├── africa_cdc.py
 │   │   ├── cdc_opendata.py
@@ -192,8 +192,10 @@ epidemiological-datasets/
 │   │   ├── india_idsp.py
 │   │   ├── infodengue_api.py
 │   │   ├── malaria_atlas.py
+│   │   ├── oman_moh.py
 │   │   ├── owid.py
 │   │   ├── paho.py
+│   │   ├── pakistan_nih.py
 │   │   ├── pathoplexus.py
 │   │   ├── respicast.py
 │   │   ├── rki_germany.py
@@ -216,7 +218,7 @@ epidemiological-datasets/
 │       ├── index.md
 │       ├── installation.md
 │       ├── quickstart.md
-│       ├── sources/           # Per-source API docs (21 pages)
+│       ├── sources/           # Per-source API docs (23 pages)
 │       ├── api/               # API reference
 │       │   ├── base.md
 │       │   ├── registry.md
@@ -288,6 +290,8 @@ epidemiological-datasets/
 |---------|-------------|------------------|--------------|--------|
 | [China CDC Weekly](http://weekly.chinacdc.cn/) | Chinese surveillance data | Weekly | Open | `epidatasets.sources.china_cdc` |
 | [IDSP India](https://idsp.nic.in/) | Indian disease surveillance | Weekly | Open* | `epidatasets.sources.india_idsp` |
+| [Oman MOH](https://moh.gov.om/en/statistics/annual-health-reports/) | Omani annual health reports (morbidity, mortality, indicators) | Annual | Open | `epidatasets.sources.oman_moh` |
+| [Pakistan NIH](https://phb.nih.org.pk/) | Pakistan IDSR weekly surveillance bulletins | Weekly | Open | `epidatasets.sources.pakistan_nih` |
 | [NIID Japan](https://www.niid.go.jp/niid/en/) | Japanese infectious disease data | Weekly | Open | Planned |
 | [Korea CDC](https://www.kdca.go.kr/) | Korean disease control data | Weekly | Open | Planned |
 
@@ -507,8 +511,10 @@ owid_covid = owid.get_covid_data(
 | `india_idsp` | `IndiaIDSPAccessor` | — | India IDSP disease surveillance |
 | `infodengue` | `InfoDengueAPI` | — | InfoDengue dengue surveillance (Brazil) |
 | `malaria_atlas` | `MalariaAtlasAccessor` | — | Malaria Atlas Project data |
+| `oman_moh` | `OmanMOHAccessor` | — | Oman Ministry of Health annual reports |
 | `owid` | `OWIDAccessor` | — | Our World in Data (COVID-19, vaccination) |
 | `paho` | `PAHOAccessor` | — | PAHO Pan-American health data |
+| `pakistan_nih` | `PakistanNIHAccessor` | — | Pakistan NIH IDSR surveillance |
 | `pathoplexus` | `PathoplexusAccessor` | `[genomics]` | Pathoplexus pathogen genomic data |
 | `respicast` | `RespiCastAccessor` | — | ECDC respiratory disease forecasting |
 | `rki` | `RKIGermanyAccessor` | — | Robert Koch Institute (Germany) |
@@ -519,7 +525,7 @@ owid_covid = owid.get_covid_data(
 
 ### What is epidatasets?
 
-A Python library providing a unified interface to 21 epidemiological data sources worldwide, installable via `pip install epidatasets`.
+A Python library providing a unified interface to 23 epidemiological data sources worldwide, installable via `pip install epidatasets`.
 
 ### Do I need to install all optional dependencies?
 
@@ -589,7 +595,7 @@ We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for deta
 
 ## 📊 Statistics
 
-- **Data sources:** 21 registered (via plugin registry)
+- **Data sources:** 23 registered (via plugin registry)
 - **Countries covered:** 100+
 - **Optional extras:** 10 (`who`, `brazil`, `eurostat`, `climate`, `geo`, `viz`, `genomics`, `cli`, `worldbank`, `search`)
 - **Example notebooks:** 20+

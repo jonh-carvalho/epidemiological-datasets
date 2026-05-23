@@ -47,6 +47,7 @@ dependencies = [
     "pandas-stubs~=2.3.3",
     "matplotlib>=3.10.9",
     "seaborn>=0.13.2",
+    "pypdf>=6.12.1",
 ]
 
 [project.optional-dependencies]
@@ -163,7 +164,9 @@ Changelog = "https://github.com/fccoelho/epidemiological-datasets/blob/main/CHAN
 compile-bytecode = true
 reinstall = false
 resolution = "highest"
-dev-dependencies = [
+
+[dependency-groups]
+dev = [
     "fpdf2>=2.8.7",
 ]
 

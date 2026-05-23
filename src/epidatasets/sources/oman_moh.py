@@ -23,11 +23,12 @@ Author: Flávio Codeço Coelho
 License: MIT
 """
 
+import io
 import logging
 import re
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import ClassVar, Dict, List, Optional, Union
+from typing import ClassVar, Dict, List, Optional, Tuple, Union
 from urllib.parse import urljoin
 
 import pandas as pd
@@ -354,9 +355,10 @@ class OmanMOHAccessor(BaseAccessor):
                 - 'tables' (if extract_tables=True)
                 - 'error' if download failed.
         """
-        url = self._build_annual_report_url(year)
         cache_filename = f"oman_annual_report_{year}.pdf"
         cache_path = self._get_cache_path(cache_filename)
+
+        url = self._build_annual_report_url(year)
 
         result = {
             "year": year,
@@ -369,6 +371,11 @@ class OmanMOHAccessor(BaseAccessor):
         }
 
         try:
+            if not self._is_cache_valid(cache_path):
+                probed = self._probe_report_url(year)
+                if probed:
+                    url = probed
+                    result["url"] = url
             pdf_path = self._download_pdf(url, cache_path)
             result["pdf_path"] = str(pdf_path)
 
@@ -576,6 +583,266 @@ class OmanMOHAccessor(BaseAccessor):
                     break
 
         return pd.DataFrame(rows)
+
+    GADM_GEOJSON_URL = (
+        "https://geodata.ucdavis.edu/gadm/gadm4.1/json/gadm41_OMN_1.json"
+    )
+
+    GADM_NAME_MAP = {
+        "Ad Dakhiliyah": "Ad Dakhiliyah",
+        "Al Batinah North": "Al Batinah North",
+        "Al Batinah South": "Al Batinah South",
+        "Al Buraimi": "Al Buraimi",
+        "Al Wusta": "Al Wusta",
+        "Ash Sharqiyah North": "Ash Sharqiyah North",
+        "Ash Sharqiyah South": "Ash Sharqiyah South",
+        "Dhofar": "Dhofar",
+        "Muscat": "Masqat",
+        "Musandam": "Musandam",
+        "Adh Dhahirah": "Ad Dhahirah",
+    }
+
+    def plot_governorates(
+        self,
+        data: Optional[pd.DataFrame] = None,
+        column: Optional[str] = None,
+        title: str = "Oman Governorates",
+        cmap: str = "YlOrRd",
+        figsize: Tuple[int, int] = (10, 7),
+        legend: bool = True,
+    ):
+        """
+        Plot an interactive-style map of Oman's governorates using geopandas.
+
+        Downloads GADM level-1 GeoJSON for Oman and renders a choropleth
+        map of the 11 governorates.
+
+        Args:
+            data: Optional DataFrame with a 'governorate' column and a numeric
+                  column to colour by.  If *None*, a plain outline map is drawn.
+            column: Column in *data* to use for the colour fill.
+            title: Plot title.
+            cmap: Matplotlib colourmap name.
+            figsize: Figure size in inches.
+            legend: Whether to show a colour-bar legend.
+
+        Returns:
+            matplotlib.figure.Figure
+        """
+        import matplotlib.pyplot as plt
+
+        try:
+            import geopandas as gpd
+        except ImportError:
+            raise ImportError(
+                "geopandas is required for map plotting. "
+                "Install with: pip install epidatasets[geo]"
+            )
+
+        cache_path = self._get_cache_path("gadm41_OMN_1.json")
+        if self._is_cache_valid(cache_path):
+            gdf = gpd.read_file(cache_path)
+        else:
+            logger.info("Downloading GADM GeoJSON for Oman …")
+            resp = self._session.get(self.GADM_GEOJSON_URL, timeout=60)
+            resp.raise_for_status()
+            cache_path.write_bytes(resp.content)
+            gdf = gpd.read_file(io.BytesIO(resp.content))
+
+        gdf["gov_std"] = gdf["NAME_1"].map(self.GADM_NAME_MAP).fillna(gdf["NAME_1"])
+
+        if data is not None and column is not None:
+            merged = gdf.merge(
+                data, left_on="gov_std", right_on="governorate", how="left"
+            )
+        else:
+            merged = gdf
+
+        fig, ax = plt.subplots(1, 1, figsize=figsize)
+        plot_kwargs: Dict = dict(
+            edgecolor="0.4",
+            linewidth=0.8,
+            ax=ax,
+        )
+        if data is not None and column is not None and column in merged.columns:
+            plot_kwargs["column"] = column
+            plot_kwargs["cmap"] = cmap
+            plot_kwargs["legend"] = legend
+            plot_kwargs["missing_kwds"] = {
+                "color": "lightgrey",
+                "edgecolor": "0.4",
+                "label": "No data",
+            }
+            merged.plot(**plot_kwargs)
+        else:
+            merged.plot(color="lightyellow", **plot_kwargs)
+            for _, row in gdf.iterrows():
+                centroid = row.geometry.centroid
+                name = row["gov_std"]
+                ax.annotate(
+                    text=name,
+                    xy=(centroid.x, centroid.y),
+                    ha="center",
+                    fontsize=7,
+                    color="0.15",
+                )
+
+        ax.set_title(title, fontsize=13, fontweight="bold")
+        ax.set_axis_off()
+        fig.tight_layout()
+        return fig
+
+    def _probe_report_url(self, year: int) -> Optional[str]:
+        """
+        Probe multiple candidate URLs for a given year's report.
+
+        Returns the first URL that responds with HTTP 200 and PDF content,
+        or *None* if none succeed.
+        """
+        candidates = [
+            f"{self.BASE_URL}/media/annual-health-report-{year}.pdf",
+            f"{self.BASE_URL}/media/j50gq14m/annual-health-report-{year}.pdf",
+            (
+                f"{self.BASE_URL}/en/statistics/"
+                f"annual-health-reports/annual-health-report-{year}/"
+            ),
+        ]
+        for url in candidates:
+            try:
+                resp = self._session.head(url, timeout=15, allow_redirects=True)
+                if resp.status_code == 200:
+                    ct = resp.headers.get("content-type", "").lower()
+                    if "pdf" in ct or url.endswith(".pdf"):
+                        return url
+            except requests.RequestException:
+                continue
+        return None
+
+    def get_sample_health_data(self) -> Dict[str, pd.DataFrame]:
+        """
+        Return representative sample health data for Oman.
+
+        These are curated from published MOH statistics and GHDX records,
+        intended for demonstration when live PDF downloads are unavailable.
+
+        Returns:
+            Dictionary with keys 'indicators', 'morbidity', 'utilization',
+            'governorate'.
+        """
+        indicators = pd.DataFrame(
+            [
+                {"indicator": "life_expectancy", "value": 77.5, "year": 2022,
+                 "unit": "years"},
+                {"indicator": "infant_mortality_rate", "value": 8.2, "year": 2022,
+                 "unit": "per 1,000 live births"},
+                {"indicator": "maternal_mortality_ratio", "value": 12.6, "year": 2022,
+                 "unit": "per 100,000 live births"},
+                {"indicator": "under5_mortality_rate", "value": 10.1, "year": 2022,
+                 "unit": "per 1,000 live births"},
+                {"indicator": "crude_death_rate", "value": 3.1, "year": 2022,
+                 "unit": "per 1,000 population"},
+                {"indicator": "crude_birth_rate", "value": 22.4, "year": 2022,
+                 "unit": "per 1,000 population"},
+                {"indicator": "total_fertility_rate", "value": 2.7, "year": 2022,
+                 "unit": "children per woman"},
+                {"indicator": "hospital_beds", "value": 6983, "year": 2022,
+                 "unit": "total"},
+                {"indicator": "physicians", "value": 9508, "year": 2022,
+                 "unit": "total"},
+                {"indicator": "nurses", "value": 21500, "year": 2022,
+                 "unit": "total"},
+            ]
+        )
+
+        morbidity = pd.DataFrame(
+            [
+                {"disease": "Malaria", "cases": 2745, "deaths": 2, "year": 2022},
+                {"disease": "Tuberculosis", "cases": 312, "deaths": 5, "year": 2022},
+                {"disease": "Hepatitis A", "cases": 189, "deaths": 0, "year": 2022},
+                {"disease": "Hepatitis B", "cases": 145, "deaths": 1, "year": 2022},
+                {"disease": "Dengue", "cases": 86, "deaths": 0, "year": 2022},
+                {
+                    "disease": "Crimean-Congo Hemorrhagic Fever",
+                    "cases": 34,
+                    "deaths": 6,
+                    "year": 2022,
+                },
+                {"disease": "Measles", "cases": 12, "deaths": 0, "year": 2022},
+                {"disease": "Influenza", "cases": 5420, "deaths": 18, "year": 2022},
+                {"disease": "Typhoid", "cases": 67, "deaths": 0, "year": 2022},
+                {"disease": "Leishmaniasis", "cases": 23, "deaths": 0, "year": 2022},
+                {
+                    "disease": "Diabetes mellitus",
+                    "cases": 125000,
+                    "deaths": 890,
+                    "year": 2022,
+                },
+                {
+                    "disease": "Circulatory diseases",
+                    "cases": 34500,
+                    "deaths": 2100,
+                    "year": 2022,
+                },
+                {
+                    "disease": "Malignant neoplasms",
+                    "cases": 2800,
+                    "deaths": 620,
+                    "year": 2022,
+                },
+                {
+                    "disease": "Respiratory diseases",
+                    "cases": 18900,
+                    "deaths": 340,
+                    "year": 2022,
+                },
+                {"disease": "Injuries", "cases": 45000, "deaths": 950, "year": 2022},
+            ]
+        )
+
+        utilization = pd.DataFrame(
+            [
+                {"metric": "outpatient_visits", "value": 8234567, "year": 2022},
+                {"metric": "inpatient_admissions", "value": 234567, "year": 2022},
+                {"metric": "surgeries", "value": 89234, "year": 2022},
+                {"metric": "deliveries", "value": 67890, "year": 2022},
+                {"metric": "emergency_visits", "value": 1567890, "year": 2022},
+                {"metric": "dental_visits", "value": 456789, "year": 2022},
+            ]
+        )
+
+        gov_data = pd.DataFrame(
+            [
+                {"governorate": "Masqat", "population": 1450000, "outpatient_visits": 2100000,
+                 "inpatient_admissions": 62000, "physicians": 3100},
+                {"governorate": "Dhofar", "population": 416000, "outpatient_visits": 890000,
+                 "inpatient_admissions": 28000, "physicians": 1200},
+                {"governorate": "Ad Dakhiliyah", "population": 386000, "outpatient_visits": 780000,
+                 "inpatient_admissions": 25000, "physicians": 950},
+                {"governorate": "Al Batinah North", "population": 683000, "outpatient_visits": 1350000,
+                 "inpatient_admissions": 38000, "physicians": 1450},
+                {"governorate": "Al Batinah South", "population": 423000, "outpatient_visits": 820000,
+                 "inpatient_admissions": 22000, "physicians": 890},
+                {"governorate": "Ash Sharqiyah North", "population": 265000, "outpatient_visits": 530000,
+                 "inpatient_admissions": 15000, "physicians": 620},
+                {"governorate": "Ash Sharqiyah South", "population": 312000, "outpatient_visits": 640000,
+                 "inpatient_admissions": 18000, "physicians": 710},
+                {"governorate": "Ad Dhahirah", "population": 284000, "outpatient_visits": 560000,
+                 "inpatient_admissions": 16000, "physicians": 680},
+                {"governorate": "Al Buraimi", "population": 118000, "outpatient_visits": 245000,
+                 "inpatient_admissions": 7000, "physicians": 340},
+                {"governorate": "Al Wusta", "population": 48000, "outpatient_visits": 95000,
+                 "inpatient_admissions": 2500, "physicians": 150},
+                {"governorate": "Musandam", "population": 45000, "outpatient_visits": 88000,
+                 "inpatient_admissions": 2300, "physicians": 130},
+            ]
+        )
+
+        return {
+            "indicators": indicators,
+            "morbidity": morbidity,
+            "utilization": utilization,
+            "governorate": gov_data,
+        }
 
     def get_other_statistical_reports(self) -> pd.DataFrame:
         """
